@@ -53,7 +53,7 @@ genos2sparseMatrix <- function(genos){
 #------------------------#
 library(vcfR)
 library(Matrix)
-setwd("D:/sfu/usra")
+setwd("D:/sfu/usra/sparse")
 vcf <- read.vcfR("chr22exons.vcf.gz")
 # vcf <- read.vcfR("D:/sfu/usra/LDheatmap/vignettes/snp_in_vcf.vcf")
 # vcf <- read.vcfR(system.file("vcf/CEU.exon.2010_09.genotypes.vcf.gz", package="GGtools"))
@@ -151,8 +151,10 @@ benchmark(
 ##       )
 
 library(Rcpp)
-sourceCpp("D:/sfu/usra/sparse_Matrix_prep.cpp")
-sourceCpp("D:/sfu/usra/sparse_Matrix.cpp")
+library(rbenchmark)
+sourceCpp("D:/sfu/usra/sparse/sparse_Matrix_prep.cpp")
+sourceCpp("D:/sfu/usra/sparse/sparse_Matrix.cpp")
+sourceCpp("D:/sfu/usra/sparse/sparse_Matrix3.cpp")
 
 index_by_person <- lapply(1:ncol(my_genos), function(x){
   get_SMindex_by_person(x, my_genos[, x])
@@ -258,7 +260,7 @@ benchmark(
 # 2        NA
 
 
-
+library(rbenchmark)
 benchmark(
   genos_to_sparse(mat11),
   myfunction(mat11),
@@ -271,4 +273,65 @@ benchmark(
 # 2      myfunction(mat11)            5   87.05    5.866     56.32     30.0         NA        NA
 
 
+myfunction = function(my_genos){
+  List = genos_to_sparse_prep(my_genos)
+  sparseMatrix(i = List[[1]], j = List[[2]], x = List[[3]])
+}
 
+
+my_genos1 = cbind(my_genos,my_genos)
+my_genos1 = rbind(my_genos1,my_genos1)
+
+smat1 = genos_to_sparse(my_genos1)
+smat2 = myfunction(my_genos1)
+identical(smat1,smat2)
+
+benchmark(
+  genos_to_sparse(my_genos1),
+  myfunction(my_genos1),
+  replications = 5
+  
+)
+#                         test replications elapsed relative user.self sys.self user.child sys.child
+# 1 genos_to_sparse(my_genos1)            5   28.36    1.578     28.01     0.25         NA        NA
+# 2      myfunction(my_genos1)            5   17.97    1.000     16.64     1.22         NA        NA
+# 
+# library(vcfR)
+# snp = read.vcfR("D:/sfu/usra/LDheatmap/vignettes/snp_in_vcf.vcf")
+# my_genos = snp@gt[,-1]
+
+mat0 = myfunction(my_genos)
+mat1 = genos_to_sparse(my_genos)
+mat3 = genos_to_sparse3(my_genos)
+identical(mat1,mat2)
+
+benchmark(
+  genos2sparseMatrix(my_genos),
+  myfunction(my_genos),
+  genos_to_sparse(my_genos),
+  genos_to_sparse3(my_genos),
+  replications = 20
+  
+)
+
+#                           test replications elapsed relative user.self sys.self user.child sys.child
+# 3    genos_to_sparse(my_genos)           20   24.41    1.693     24.07     0.30         NA        NA
+# 4   genos_to_sparse3(my_genos)           20   14.42    1.000     13.38     1.05         NA        NA
+# 1 genos2sparseMatrix(my_genos)           20   68.03    4.718     66.80     1.10         NA        NA
+# 2         myfunction(my_genos)           20   15.36    1.065     14.08     1.22         NA        NA
+
+benchmark(
+  genos2sparseMatrix(mat11),
+  myfunction(mat11),
+  genos_to_sparse(mat11),
+  genos_to_sparse3(mat11),
+  replications = 2
+  
+)
+
+
+#                        test replications elapsed relative user.self sys.self user.child sys.child
+# 3    genos_to_sparse(mat11)            2    5.16    1.000      3.90     1.25         NA        NA
+# 4   genos_to_sparse3(mat11)            2   26.15    5.068     17.21     8.91         NA        NA
+# 1 genos2sparseMatrix(mat11)            2   66.03   12.797     31.32    33.55         NA        NA
+# 2         myfunction(mat11)            2   32.68    6.333     18.00    14.69         NA        NA
